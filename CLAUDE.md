@@ -5,17 +5,16 @@ B2B notification SaaS platform. This repo is primarily a **hands-on project for 
 ## Stack
 - **Language:** Go, standard library only (no third-party frameworks unless explicitly approved)
 - **Base image:** `scratch` — binaries must be **statically linked** (`CGO_ENABLED=0`)
-- **Cluster:** GKE (Standard), on GCP
+- **Cluster:** GKE (Standard) on GCP — **Gateway API** enabled (`channel=standard`, i.e. `networkConfig.gatewayApiConfig.channel=CHANNEL_STANDARD`)
 - **GitOps:** GitHub Actions builds/pushes images; **ArgoCD** syncs manifests from this repo
 - **Manifests:** plain Kubernetes YAML + `kubectl kustomize` (no separate `kustomize` binary)
-
-> Tooling note: `gcloud` and `go` are **not yet installed** on this machine. Install both before GKE or build work.
 
 ## Repository Layout
 ```
 app/                  # Go service(s)
 k8s/                  # Kubernetes manifests, synced by ArgoCD
 k8s/smb/              # SMB storage manifests
+scripts/              # cluster create/delete shell scripts
 .github/workflows/    # CI: build, test, push image
 ```
 
@@ -38,6 +37,11 @@ k8s/smb/              # SMB storage manifests
       app.kubernetes.io/part-of: notiflex
   ```
 
+## Environment
+- **GCP project:** `bubbly-subject-501015-t9` · **region/zone:** `us-central1` / `us-central1-a`
+- **Artifact Registry:** `us-central1-docker.pkg.dev/bubbly-subject-501015-t9/containers`
+- **Cluster:** `notiflex` (Spot — check live state with `make cluster-status`)
+
 ## Security (hard rules)
 - **Never hardcode secrets** — tokens, API keys, passwords — in code or in manifests.
   - In-cluster: read from `Secret` resources (env var refs or volume mounts), sourced from a secret manager.
@@ -50,6 +54,7 @@ Because the base image is `scratch`:
 - Target `GOOS=linux GOARCH=amd64` (or the cluster's arch).
 - No OS packages, no shell inside the container — logs to stdout/stderr only.
 
-## Local Commands
-- Validate manifests: `kubectl kustomize k8s/ | kubectl apply --dry-run=client -f -`
-- ArgoCD CLI: `argocd app sync <app>` (only when GitOps flow is bypassed intentionally)
+## Automation
+Cluster lifecycle and image build/push live in `scripts/` + `Makefile`. **Run `make help`** for targets; each `scripts/*.sh` header documents its env-var overrides. Two rules to remember:
+- **Cluster is Spot** — ephemeral; recreate freely with `make cluster-delete` / `make cluster-create`.
+- **Image tag = git short SHA** — manifests in `k8s/` reference the SHA (or `@sha256:` digest), **never `:latest`**.

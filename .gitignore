@@ -1,0 +1,9 @@
+# Go build output
+/app/notiflex-api
+*.exe
+*.test
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
