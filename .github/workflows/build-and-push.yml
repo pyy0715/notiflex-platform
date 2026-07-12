@@ -1,0 +1,52 @@
+name: Build and push notiflex-api image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "scripts/image-build.sh"
+      - "scripts/image-push.sh"
+      - "VERSION"
+      - ".github/workflows/build-and-push.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.4"
+
+      - name: Run tests
+        working-directory: app
+        run: go test ./...
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push image
+        run: ./scripts/image-push.sh
+
+      - name: Summary
+        run: |
+          SHA="$(git rev-parse --short=7 HEAD)"
+          echo "### Image pushed :rocket:" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`us-central1-docker.pkg.dev/bubbly-subject-501015-t9/containers/notiflex-api:${SHA}\`" >> "$GITHUB_STEP_SUMMARY"
