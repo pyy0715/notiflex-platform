@@ -1,6 +1,7 @@
 FROM golang:1.26.4-alpine AS builder
 
 ARG VERSION=dev
+ARG COMMIT=dev
 
 WORKDIR /app
 
@@ -10,7 +11,7 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -ldflags="-s -w -X main.version=${VERSION}" -o /notiflex-api .
+    go build -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT}" -o /notiflex-api .
 
 FROM scratch
 

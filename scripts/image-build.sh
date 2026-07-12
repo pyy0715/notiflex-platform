@@ -20,17 +20,20 @@ FULL_IMAGE="${REGISTRY}/${IMAGE_NAME}"
 # Determine immutable tag from git short SHA. Require a clean-ish commit:
 # fall back to 'dev' if not in a git repo.
 SHA="$(git -C "$(dirname "$0")/.." rev-parse --short=7 HEAD 2>/dev/null || echo dev)"
+VERSION="$(cat "$(dirname "$0")/../VERSION" 2>/dev/null || echo dev)"
 TAG_IMMUTABLE="${FULL_IMAGE}:${SHA}"
 TAG_LATEST="${FULL_IMAGE}:latest"
 
 echo "==> Building ${IMAGE_NAME}"
 echo "    context: ${SOURCE_DIR}"
+echo "    version: ${VERSION}  (from VERSION file)"
 echo "    tags:    :${SHA}  (immutable)"
 echo "             :latest  (dev pointer)"
 
 docker build \
   --platform linux/amd64 \
-  --build-arg VERSION="${SHA}" \
+  --build-arg VERSION="${VERSION}" \
+  --build-arg COMMIT="${SHA}" \
   --tag "${TAG_IMMUTABLE}" \
   --tag "${TAG_LATEST}" \
   "${SOURCE_DIR}"

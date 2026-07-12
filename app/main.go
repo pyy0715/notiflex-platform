@@ -10,6 +10,7 @@ import (
 
 var counter int64
 var version = "dev"
+var commit = "dev"
 
 func main() {
 	hostname, _ := os.Hostname()
@@ -21,7 +22,10 @@ func main() {
 
 	http.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"version": version})
+		json.NewEncoder(w).Encode(map[string]string{
+			"version": version,
+			"commit":  commit,
+		})
 	})
 
 	http.HandleFunc("/id", func(w http.ResponseWriter, r *http.Request) {
