@@ -29,6 +29,7 @@ echo "    tags:    :${SHA}  (immutable)"
 echo "             :latest  (dev pointer)"
 
 docker build \
+  --platform linux/amd64 \
   --tag "${TAG_IMMUTABLE}" \
   --tag "${TAG_LATEST}" \
   "${SOURCE_DIR}"
