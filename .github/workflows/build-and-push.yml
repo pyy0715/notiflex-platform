@@ -8,7 +8,7 @@ on:
       - "scripts/image-build.sh"
       - "scripts/image-push.sh"
       - "VERSION"
-      - ".github/workflows/build-and-push.yml"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
