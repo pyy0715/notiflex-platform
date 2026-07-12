@@ -19,6 +19,11 @@ resource "google_container_cluster" "notiflex" {
   project  = var.project_id
   location = var.zone
 
+  # This cluster is ephemeral by design (see CLAUDE.md) — torn down and
+  # rebuilt often. The provider's deletion_protection defaults to true,
+  # which blocks terraform destroy; disable it explicitly.
+  deletion_protection = false
+
   # Node pool is managed separately below so it can be resized/upgraded
   # independently of the cluster control plane.
   remove_default_node_pool = true
