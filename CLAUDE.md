@@ -6,7 +6,7 @@ B2B notification SaaS platform. This repo is primarily a **hands-on project for 
 - **Language:** Go, standard library only (no third-party frameworks unless explicitly approved)
 - **Base image:** `scratch` — binaries must be **statically linked** (`CGO_ENABLED=0`)
 - **Cluster:** GKE (Standard) on GCP — **Gateway API** enabled (`channel=standard`, i.e. `networkConfig.gatewayApiConfig.channel=CHANNEL_STANDARD`)
-- **GitOps:** GitHub Actions builds/pushes images and commits the updated tag back to `k8s/`; **ArgoCD** syncs from there — and manages its own install too (app-of-apps, see `k8s/argocd/`)
+- **GitOps:** GitHub Actions builds/pushes images and commits the updated tag back to `k8s/`; **ArgoCD** syncs from there via a `root` Application (app-of-apps, see `k8s/apps/`)
 - **Manifests:** plain Kubernetes YAML + `kubectl kustomize` (no separate `kustomize` binary)
 
 ## Repository Layout
@@ -14,7 +14,8 @@ B2B notification SaaS platform. This repo is primarily a **hands-on project for 
 app/                  # Go service(s)
 k8s/                  # Kubernetes manifests, synced by ArgoCD
 k8s/smb/              # SMB storage manifests
-k8s/argocd/           # ArgoCD install (Kustomize + upstream install.yaml) + its own Application (self-managed)
+k8s/bootstrap/        # ArgoCD controller install (Kustomize + upstream install.yaml) — NOT GitOps-managed, applied by hand
+k8s/apps/             # app-of-apps registry — root Application + child Applications (this IS what ArgoCD watches)
 terraform/iam/        # WIF pool/provider, CI service account, IAM — independent of cluster lifecycle
 terraform/cluster/    # GKE cluster only — destroy/apply freely (Spot, ephemeral)
 .github/workflows/    # CI: test, build, push image (all logic lives in the workflow YAML), update manifest tag
@@ -58,7 +59,11 @@ Because the base image is `scratch`:
 
 ## Automation
 - **GKE cluster**: `cd terraform/cluster && terraform apply` / `terraform destroy`. Ephemeral by design — this project tears the cluster down and rebuilds it often for learning. Terraform's job stops at "a cluster with a working API server" — nothing Kubernetes-native lives in this module.
-- **ArgoCD bootstraps itself via GitOps, not Terraform.** After `terraform apply` + `gcloud container clusters get-credentials`, run `kubectl apply -k k8s/argocd` **once**. That installs ArgoCD (Kustomize referencing the upstream `install.yaml` at a pinned version tag) along with a `root` Application pointing back at `k8s/argocd` itself (the app-of-apps pattern) — from then on ArgoCD manages its own manifests, including future version bumps (just move the pinned tag in `k8s/argocd/kustomization.yaml` and push). Do not reintroduce a `helm_release`/`kubernetes` provider for ArgoCD in Terraform — that was the previous approach and it's been replaced.
+- **ArgoCD bootstrap is a two-step manual process, separate from Terraform.** After `terraform apply` + `gcloud container clusters get-credentials`:
+  1. `kubectl apply -k k8s/bootstrap --server-side` — installs the ArgoCD controller itself (Kustomize referencing the upstream `install.yaml` at a pinned version tag). **Server-side apply is required**: the ApplicationSet CRD is too large for the `last-applied-configuration` annotation used by client-side apply and will fail with `metadata.annotations: Too long`.
+  2. `kubectl apply -f k8s/apps/root-app.yaml` — registers the `root` Application, which points at `k8s/apps` (a pure app-of-apps registry containing only Application manifests, e.g. `notiflex-smb-app.yaml`). From then on ArgoCD manages the child Applications in `k8s/apps` automatically (`selfHeal`/`prune`).
+  - **`k8s/bootstrap` is intentionally NOT watched by any Application** — ArgoCD does not manage its own controller install via GitOps. To upgrade ArgoCD's version: bump the pinned tag in `k8s/bootstrap/kustomization.yaml`, push, then re-run `kubectl apply -k k8s/bootstrap --server-side` by hand. This is a deliberate split from the old design (where `k8s/argocd/` mixed the controller install and the Application registry in one self-managed directory) — separating them makes "what does `root` manage" answer cleanly ("child Applications only") and matches how most real ArgoCD deployments operate.
+  - Do not reintroduce a `helm_release`/`kubernetes` provider for ArgoCD in Terraform — that was a prior approach and it's been replaced.
 - **WIF/IAM**: `terraform/iam`, a separate root module — **never merge it into `terraform/cluster`**. GCP soft-deletes a Workload Identity Pool for 30 days and won't let you recreate the same pool ID until that window passes, so if WIF shared state with the cluster, a routine cluster teardown would break CI for up to a month. It changes rarely, but keeping it in its own state is what makes tearing down `terraform/cluster` safe to do freely.
 - Terraform state is local and gitignored (`terraform/**/*.tfstate`) — no remote backend.
 - **Image build/push** happens only in CI (`.github/workflows/build-and-push.yml`) — there's no local build script anymore. It reads `VERSION`, builds for `linux/amd64` (must match the GKE node arch — building on Apple Silicon without pinning platform produces an arm64 image GKE can't pull), injects `VERSION`/`COMMIT` via build args, and pushes the git-short-SHA + `:latest` tags.

@@ -6,5 +6,3 @@ namespace: argocd
 resources:
   - namespace.yaml
   - https://raw.githubusercontent.com/argoproj/argo-cd/v3.4.5/manifests/install.yaml
-  - root-app.yaml
-  - notiflex-smb-app.yaml
