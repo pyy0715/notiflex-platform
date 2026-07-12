@@ -30,6 +30,7 @@ echo "             :latest  (dev pointer)"
 
 docker build \
   --platform linux/amd64 \
+  --build-arg VERSION="${SHA}" \
   --tag "${TAG_IMMUTABLE}" \
   --tag "${TAG_LATEST}" \
   "${SOURCE_DIR}"
