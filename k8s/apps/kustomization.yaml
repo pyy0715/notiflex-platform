@@ -5,3 +5,5 @@ resources:
   - root-app.yaml
   - notiflex-smb-app.yaml
   - monitoring-app.yaml
+  - loki-app.yaml
+  - fluent-bit-app.yaml
