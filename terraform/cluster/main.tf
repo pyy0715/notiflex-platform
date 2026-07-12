@@ -6,22 +6,12 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 6.0"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = "~> 2.31"
-    }
-    helm = {
-      source  = "hashicorp/helm"
-      version = "~> 2.15"
-    }
   }
 }
 
 provider "google" {
   project = var.project_id
 }
-
-data "google_client_config" "default" {}
 
 # Spot, e2-medium, autoscaling 1->3, Gateway API (standard channel), zonal.
 resource "google_container_cluster" "notiflex" {
@@ -62,29 +52,4 @@ resource "google_container_node_pool" "primary" {
       "https://www.googleapis.com/auth/cloud-platform",
     ]
   }
-}
-
-provider "kubernetes" {
-  host                   = "https://${google_container_cluster.notiflex.endpoint}"
-  token                  = data.google_client_config.default.access_token
-  cluster_ca_certificate = base64decode(google_container_cluster.notiflex.master_auth[0].cluster_ca_certificate)
-}
-
-provider "helm" {
-  kubernetes {
-    host                   = "https://${google_container_cluster.notiflex.endpoint}"
-    token                  = data.google_client_config.default.access_token
-    cluster_ca_certificate = base64decode(google_container_cluster.notiflex.master_auth[0].cluster_ca_certificate)
-  }
-}
-
-resource "helm_release" "argocd" {
-  name             = "argocd"
-  repository       = "https://argoproj.github.io/argo-helm"
-  chart            = "argo-cd"
-  version          = var.argocd_chart_version
-  namespace        = var.argocd_namespace
-  create_namespace = true
-
-  depends_on = [google_container_node_pool.primary]
 }

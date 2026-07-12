@@ -45,15 +45,3 @@ variable "disk_size_gb" {
   type        = number
   default     = 30
 }
-
-variable "argocd_chart_version" {
-  description = "argo/argo-cd Helm chart version"
-  type        = string
-  default     = "10.1.3"
-}
-
-variable "argocd_namespace" {
-  description = "Namespace to install ArgoCD into"
-  type        = string
-  default     = "argocd"
-}
