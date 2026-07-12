@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - root-app.yaml
   - notiflex-smb-app.yaml
+  - monitoring-app.yaml

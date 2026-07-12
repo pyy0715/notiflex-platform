@@ -1,0 +1,43 @@
+prometheus:
+  prometheusSpec:
+    resources:
+      requests:
+        cpu: 80m
+        memory: 256Mi
+    retention: 24h
+    storageSpec: {}
+
+grafana:
+  resources:
+    requests:
+      cpu: 30m
+      memory: 128Mi
+  admin:
+    existingSecret: grafana-admin-credentials
+    userKey: admin-user
+    passwordKey: admin-password
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 25m
+        memory: 64Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+kubeStateMetrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+nodeExporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
