@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: notiflex-api
-          image: us-central1-docker.pkg.dev/bubbly-subject-501015-t9/containers/notiflex-api:0.1.0
+          image: us-central1-docker.pkg.dev/bubbly-subject-501015-t9/containers/notiflex-api:5f8d915
           ports:
             - name: http
               containerPort: 8080
