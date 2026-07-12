@@ -7,3 +7,10 @@
 .DS_Store
 .idea/
 .vscode/
+
+# Terraform (local state only — not remote-backed)
+terraform/**/.terraform/
+terraform/**/*.tfstate
+terraform/**/*.tfstate.*
+terraform/**/.terraform.lock.hcl
+terraform/**/crash.log

@@ -14,7 +14,10 @@ B2B notification SaaS platform. This repo is primarily a **hands-on project for 
 app/                  # Go service(s)
 k8s/                  # Kubernetes manifests, synced by ArgoCD
 k8s/smb/              # SMB storage manifests
-scripts/              # cluster create/delete shell scripts
+k8s/argocd/           # ArgoCD Application CRs + namespace (apply after terraform/cluster is up)
+scripts/              # cluster create/delete shell scripts (legacy, bash+gcloud)
+terraform/persistent/ # WIF pool/provider, CI service account, IAM — project-level, rarely touched
+terraform/cluster/    # GKE cluster + ArgoCD Helm release — destroy/apply freely (Spot, ephemeral)
 .github/workflows/    # CI: build, test, push image
 ```
 
@@ -58,3 +61,5 @@ Because the base image is `scratch`:
 Cluster lifecycle and image build/push live in `scripts/` + `Makefile`. **Run `make help`** for targets; each `scripts/*.sh` header documents its env-var overrides. Two rules to remember:
 - **Cluster is Spot** — ephemeral; recreate freely with `make cluster-delete` / `make cluster-create`.
 - **Image tag = git short SHA** — manifests in `k8s/` reference the SHA (or `@sha256:` digest), **never `:latest`**.
+
+- **GKE cluster + ArgoCD are managed via Terraform** (`terraform/cluster`, `make cluster-tf-apply` / `cluster-tf-destroy`) so they're reproducible across the frequent teardown/rebuild cycles this project uses for learning. WIF/IAM (`terraform/persistent`) is separate and rarely needs re-applying — it doesn't depend on cluster lifecycle. State is local (`terraform/**/*.tfstate`, gitignored) — after any teardown/rebuild outside Terraform, reconcile state before the next apply. After `cluster-tf-apply`, run `kubectl apply -f k8s/argocd` to register the Application CRs.
