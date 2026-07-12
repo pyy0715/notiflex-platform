@@ -1,7 +1,5 @@
 .PHONY: help cluster-create cluster-delete cluster-status cluster-creds \
-        image-build image-push image-list \
-        tf-persistent-plan tf-persistent-apply \
-        cluster-tf-plan cluster-tf-apply cluster-tf-destroy
+        image-build image-push image-list
 
 # Defaults — override on the CLI, e.g. `make cluster-create ZONE=us-central1-b`
 CLUSTER_NAME ?= notiflex
@@ -38,18 +36,3 @@ image-push: ## Build and push the image to Artifact Registry
 image-list: ## List images in Artifact Registry
 	gcloud artifacts docker images list $(REGISTRY)/$(IMAGE_NAME) --include-tags \
 	  --format="table(package:label=IMAGE, tags:label=TAG, version:label=DIGEST, create_time:label=CREATED)"
-
-tf-persistent-plan: ## Plan the persistent Terraform stack (WIF/IAM — rarely changes)
-	cd terraform/persistent && terraform init -input=false && terraform plan
-
-tf-persistent-apply: ## Apply the persistent Terraform stack (WIF/IAM — rarely changes)
-	cd terraform/persistent && terraform init -input=false && terraform apply
-
-cluster-tf-plan: ## Plan the GKE cluster + ArgoCD Terraform stack
-	cd terraform/cluster && terraform init -input=false && terraform plan
-
-cluster-tf-apply: ## Create/update the GKE cluster + ArgoCD via Terraform
-	cd terraform/cluster && terraform init -input=false && terraform apply
-
-cluster-tf-destroy: ## Destroy the GKE cluster + ArgoCD via Terraform
-	cd terraform/cluster && terraform init -input=false && terraform destroy
