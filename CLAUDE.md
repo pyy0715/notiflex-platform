@@ -15,10 +15,9 @@ app/                  # Go service(s)
 k8s/                  # Kubernetes manifests, synced by ArgoCD
 k8s/smb/              # SMB storage manifests
 k8s/argocd/           # ArgoCD Application CRs + namespace (apply after terraform/cluster is up)
-scripts/              # cluster create/delete shell scripts (legacy, bash+gcloud)
-terraform/persistent/ # WIF pool/provider, CI service account, IAM — project-level, rarely touched
+terraform/iam/        # WIF pool/provider, CI service account, IAM — project-level, apply once
 terraform/cluster/    # GKE cluster + ArgoCD Helm release — destroy/apply freely (Spot, ephemeral)
-.github/workflows/    # CI: build, test, push image
+.github/workflows/    # CI: test, build, push image (all logic lives in the workflow YAML), update manifest tag
 ```
 
 ## Working Principles (always follow)
@@ -58,9 +57,8 @@ Because the base image is `scratch`:
 - No OS packages, no shell inside the container — logs to stdout/stderr only.
 
 ## Automation
-Cluster lifecycle and image build/push live in `scripts/` + `Makefile`. **Run `make help`** for targets; each `scripts/*.sh` header documents its env-var overrides. Two rules to remember:
-- **Cluster is Spot** — ephemeral; recreate freely with `make cluster-delete` / `make cluster-create`.
-- **Image tag = git short SHA** — manifests in `k8s/` reference the SHA (or `@sha256:` digest), **never `:latest`**.
-
-- **GKE cluster + ArgoCD are managed via Terraform** (`cd terraform/cluster && terraform apply` / `terraform destroy`) so they're reproducible across the frequent teardown/rebuild cycles this project uses for learning.
-- **WIF/IAM stays in a separate root module** (`terraform/persistent`), applied once and left alone — **do not fold it into `terraform/cluster`**. GCP soft-deletes a Workload Identity Pool for 30 days and won't let you recreate the same pool ID until that window passes, so if WIF lived in the same state as the cluster, a routine `terraform destroy` on the cluster would break CI for up to 30 days. State is local (`terraform/**/*.tfstate`, gitignored). After `terraform apply` in `terraform/cluster`, run `kubectl apply -f k8s/argocd` to register the Application CRs.
+- **GKE cluster + ArgoCD**: `cd terraform/cluster && terraform apply` / `terraform destroy`. Ephemeral by design — this project tears the cluster down and rebuilds it often for learning, so both live in Terraform for reproducibility. After `apply`, run `kubectl apply -f k8s/argocd` to register the Application CRs (kept as plain manifests, not folded into Terraform, since ArgoCD itself already manages them via GitOps once installed).
+- **WIF/IAM**: `terraform/iam`, a separate root module — **never merge it into `terraform/cluster`**. GCP soft-deletes a Workload Identity Pool for 30 days and won't let you recreate the same pool ID until that window passes, so if WIF shared state with the cluster, a routine cluster teardown would break CI for up to a month. Apply once, leave alone.
+- Terraform state is local and gitignored (`terraform/**/*.tfstate`) — no remote backend.
+- **Image build/push** happens only in CI (`.github/workflows/build-and-push.yml`) — there's no local build script anymore. It reads `VERSION`, builds for `linux/amd64` (must match the GKE node arch — building on Apple Silicon without pinning platform produces an arm64 image GKE can't pull), injects `VERSION`/`COMMIT` via build args, and pushes the git-short-SHA + `:latest` tags.
+- **Image tag = git short SHA** — manifests in `k8s/` reference the SHA (or `@sha256:` digest), **never `:latest`**. CI updates `k8s/smb/deployment.yaml`'s tag and commits it automatically (as `github-actions[bot]`) after a successful push — that commit only touches `k8s/smb/`, which isn't in this workflow's trigger paths, so it doesn't retrigger the build.

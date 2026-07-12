@@ -5,10 +5,13 @@ on:
     branches: [main]
     paths:
       - "app/**"
-      - "scripts/image-build.sh"
-      - "scripts/image-push.sh"
       - "VERSION"
+      - ".github/workflows/build-and-push.yml"
   workflow_dispatch: {}
+
+env:
+  REGISTRY: us-central1-docker.pkg.dev/bubbly-subject-501015-t9/containers
+  IMAGE_NAME: notiflex-api
 
 permissions:
   contents: write
@@ -34,7 +37,9 @@ jobs:
 
       - name: Determine image tag
         id: build
-        run: echo "sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "sha=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -48,12 +53,25 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Authenticate Docker to Artifact Registry
+        run: gcloud auth configure-docker "${{ env.REGISTRY }}" --quiet
+
       - name: Build and push image
-        run: ./scripts/image-push.sh
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            VERSION=${{ steps.build.outputs.version }}
+            COMMIT=${{ steps.build.outputs.sha }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.build.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
 
       - name: Update manifest image tag
         run: |
-          sed -i "s|image: .*notiflex-api:.*|image: us-central1-docker.pkg.dev/bubbly-subject-501015-t9/containers/notiflex-api:${{ steps.build.outputs.sha }}|" \
+          sed -i "s|image: .*${{ env.IMAGE_NAME }}:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.build.outputs.sha }}|" \
             k8s/smb/deployment.yaml
 
       - name: Configure git identity
@@ -71,4 +89,4 @@ jobs:
       - name: Summary
         run: |
           echo "### Image pushed :rocket:" >> "$GITHUB_STEP_SUMMARY"
-          echo "\`us-central1-docker.pkg.dev/bubbly-subject-501015-t9/containers/notiflex-api:${{ steps.build.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.build.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"

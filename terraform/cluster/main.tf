@@ -23,8 +23,7 @@ provider "google" {
 
 data "google_client_config" "default" {}
 
-# Mirrors scripts/cluster-create.sh: Spot, e2-medium, autoscaling 1->3,
-# Gateway API (standard channel), zonal.
+# Spot, e2-medium, autoscaling 1->3, Gateway API (standard channel), zonal.
 resource "google_container_cluster" "notiflex" {
   name     = var.cluster_name
   project  = var.project_id
