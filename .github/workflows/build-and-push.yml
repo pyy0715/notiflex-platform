@@ -64,7 +64,7 @@ jobs:
       - name: Update manifest image tag
         run: |
           sed -i "s|image: .*${{ env.IMAGE_NAME }}:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.build.outputs.sha }}|" \
-            k8s/api/deployment.yaml
+            k8s/api/rollout.yaml
 
       - name: Configure git identity
         run: |
@@ -73,7 +73,7 @@ jobs:
 
       - name: Commit and push manifest
         run: |
-          git add k8s/api/deployment.yaml
+          git add k8s/api/rollout.yaml
           git diff --cached --quiet && echo "no changes" && exit 0
           git commit -m "ci: update image tag to ${{ steps.build.outputs.sha }}"
           git push
