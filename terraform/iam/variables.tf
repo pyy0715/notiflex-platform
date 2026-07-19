@@ -4,12 +4,6 @@ variable "project_id" {
   default     = "bubbly-subject-501015-t9"
 }
 
-variable "project_number" {
-  description = "GCP project number (used in WIF resource paths)"
-  type        = string
-  default     = "677918619040"
-}
-
 variable "github_repo" {
   description = "GitHub repo allowed to assume the CI service account, as owner/name"
   type        = string

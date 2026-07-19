@@ -3,7 +3,7 @@ kind: Kustomization
 
 resources:
   - root-app.yaml
-  - notiflex-smb-app.yaml
+  - notiflex-api-app.yaml
   - monitoring-app.yaml
   - loki-app.yaml
   - fluent-bit-app.yaml

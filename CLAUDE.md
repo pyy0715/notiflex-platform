@@ -13,14 +13,14 @@ B2B notification SaaS platform. This repo is primarily a **hands-on project for 
 ```
 app/                  # Go service(s)
 k8s/                  # Kubernetes manifests, synced by ArgoCD
-k8s/smb/              # SMB storage manifests
+k8s/api/              # notiflex-api service manifests (Deployment/Service/Namespace)
 k8s/monitoring/       # kube-prometheus-stack Helm values (chart is an ArgoCD multi-source Application, not vendored)
 k8s/logging/          # Loki (single-binary) + Fluent Bit Helm values, same pattern as k8s/monitoring
 k8s/bootstrap/        # ArgoCD controller install (Kustomize + upstream install.yaml) — NOT GitOps-managed, applied by hand
 k8s/apps/             # app-of-apps registry — root Application + child Applications (this IS what ArgoCD watches)
 terraform/iam/        # WIF pool/provider, CI service account, IAM — independent of cluster lifecycle
 terraform/cluster/    # GKE cluster only — destroy/apply freely (Spot, ephemeral)
-.github/workflows/    # CI: test, build, push image (all logic lives in the workflow YAML), update manifest tag
+.github/workflows/    # CI: build, push image (all logic lives in the workflow YAML), update manifest tag
 ```
 
 ## Working Principles (always follow)
@@ -65,7 +65,7 @@ Because the base image is `scratch`:
   1. `gcloud container clusters get-credentials notiflex --zone us-central1-a`
   2. `kubectl create secret generic grafana-admin-credentials -n monitoring --from-literal=admin-user=admin --from-literal=admin-password=<generate one>` — **must exist before the `monitoring` Application syncs**, or the Grafana pod fails to start (`grafana.admin.existingSecret` in `k8s/monitoring/values.yaml` references it, and it's intentionally never committed — see Security). Create the `monitoring` namespace first if `kubectl create secret` complains it doesn't exist yet (`kubectl create ns monitoring`).
   3. `kubectl apply -k k8s/bootstrap --server-side` — installs the ArgoCD controller itself (Kustomize referencing the upstream `install.yaml` at a pinned version tag). **Server-side apply is required**: several CRDs here (and in kube-prometheus-stack/Loki, installed later) are too large for the `last-applied-configuration` annotation used by client-side apply and fail with `metadata.annotations: Too long`.
-  4. `kubectl apply -f k8s/apps/root-app.yaml` — registers the `root` Application, which points at `k8s/apps` (a pure app-of-apps registry containing only Application manifests: `notiflex-smb-app.yaml`, `monitoring-app.yaml`, `loki-app.yaml`, `fluent-bit-app.yaml`). From then on ArgoCD manages all child Applications automatically (`selfHeal`/`prune`), each with `ServerSideApply=true` set from the start so CRD-heavy charts don't repeat the same failure.
+  4. `kubectl apply -f k8s/apps/root-app.yaml` — registers the `root` Application, which points at `k8s/apps` (a pure app-of-apps registry containing only Application manifests: `notiflex-api-app.yaml`, `monitoring-app.yaml`, `loki-app.yaml`, `fluent-bit-app.yaml`). From then on ArgoCD manages all child Applications automatically (`selfHeal`/`prune`), each with `ServerSideApply=true` set from the start so CRD-heavy charts don't repeat the same failure.
   5. **If `monitoring`'s Alertmanager/Prometheus never materialize** (`kubectl get statefulset -n monitoring` stays empty even though the Application shows `Synced`): the prometheus-operator pod started before its own CRDs existed and cached "not installed" at boot — it doesn't re-discover CRDs registered after it started. Fix: `kubectl rollout restart deployment monitoring-kube-prometheus-operator -n monitoring`. Whether this is still needed with `ServerSideApply=true` in place from the start (rather than added after the fact, as happened once) hasn't been re-verified on a clean bootstrap.
   - **`k8s/bootstrap` is intentionally NOT watched by any Application** — ArgoCD does not manage its own controller install via GitOps. To upgrade ArgoCD's version: bump the pinned tag in `k8s/bootstrap/kustomization.yaml`, push, then re-run `kubectl apply -k k8s/bootstrap --server-side` by hand. This is a deliberate split (controller install vs. the Application registry) — it makes "what does `root` manage" answer cleanly ("child Applications only") and matches how most real ArgoCD deployments operate.
   - Do not reintroduce a `helm_release`/`kubernetes` provider for ArgoCD in Terraform — that was a prior approach and it's been replaced.
@@ -73,4 +73,4 @@ Because the base image is `scratch`:
 - **WIF/IAM**: `terraform/iam`, a separate root module — **never merge it into `terraform/cluster`**. GCP soft-deletes a Workload Identity Pool for 30 days and won't let you recreate the same pool ID until that window passes, so if WIF shared state with the cluster, a routine cluster teardown would break CI for up to a month. It changes rarely, but keeping it in its own state is what makes tearing down `terraform/cluster` safe to do freely.
 - Terraform state is local and gitignored (`terraform/**/*.tfstate`) — no remote backend.
 - **Image build/push** happens only in CI (`.github/workflows/build-and-push.yml`) — there's no local build script anymore. It reads `VERSION`, builds for `linux/amd64` (must match the GKE node arch — building on Apple Silicon without pinning platform produces an arm64 image GKE can't pull), injects `VERSION`/`COMMIT` via build args, and pushes the git-short-SHA + `:latest` tags.
-- **Image tag = git short SHA** — manifests in `k8s/` reference the SHA (or `@sha256:` digest), **never `:latest`**. CI updates `k8s/smb/deployment.yaml`'s tag and commits it automatically (as `github-actions[bot]`) after a successful push — that commit only touches `k8s/smb/`, which isn't in this workflow's trigger paths, so it doesn't retrigger the build.
+- **Image tag = git short SHA** — manifests in `k8s/` reference the SHA (or `@sha256:` digest), **never `:latest`**. CI updates `k8s/api/deployment.yaml`'s tag and commits it automatically (as `github-actions[bot]`) after a successful push — that commit only touches `k8s/api/`, which isn't in this workflow's trigger paths, so it doesn't retrigger the build.
