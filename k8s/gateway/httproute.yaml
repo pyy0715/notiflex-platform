@@ -1,0 +1,22 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: notiflex-api-route
+  namespace: notiflex
+  labels:
+    app.kubernetes.io/name: notiflex-api-route
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: notiflex
+spec:
+  parentRefs:
+    - name: notiflex-gateway   # 위에서 만든 Gateway
+      sectionName: http         # Gateway의 http listener에 부착
+  hostnames: []                 # 모든 host 매칭 (필요시 도메인 지정)
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: notiflex-api    # k8s/api/service.yaml 의 Service
+          port: 80

@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: notiflex-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: notiflex
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/pyy0715/notiflex-platform.git
+    targetRevision: main
+    path: k8s/gateway
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: notiflex
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false  # notiflex ns는 k8s/api 앱이 이미 관리
+      - ServerSideApply=true

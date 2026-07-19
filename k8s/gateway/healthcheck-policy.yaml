@@ -1,0 +1,28 @@
+apiVersion: networking.gke.io/v1
+kind: HealthCheckPolicy
+metadata:
+  name: notiflex-api-healthcheck
+  namespace: notiflex
+  labels:
+    app.kubernetes.io/name: notiflex-api-healthcheck
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: notiflex
+spec:
+  default:
+    # deployment.yaml 의 readiness/livenessProbe 와 동일한 /health 경로로 체크
+    config:
+      type: HTTP
+      httpHealthCheck:
+        requestPath: /health
+        responseCriteria:
+          acceptableResponseCodes:
+            - code: 200
+        portSpecification: USE_SERVING_PORT   # Service의 targetPort(8080) 사용
+    requestInterval: 5s
+    timeout: 5s
+    healthyThreshold: 2
+    unhealthyThreshold: 2
+  targetRef:
+    group: ""
+    kind: Service
+    name: notiflex-api

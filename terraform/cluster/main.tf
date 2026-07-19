@@ -13,6 +13,23 @@ provider "google" {
   project = var.project_id
 }
 
+# Proxy-only subnet required by the regional external Application Load Balancer
+# (gke-l7-regional-external-managed GatewayClass). GKE does NOT create this for
+# you — it's a VPC prerequisite. Without it, the Gateway stays Programmed: False.
+# default network is auto-mode, which reserves the ENTIRE 10.128.0.0/9 range
+# (10.128.0.0 - 10.255.255.255) for its own per-region subnets. Any CIDR inside
+# 10.128.0.0/9 is rejected with "cannot overlap with 10.128.0.0/9". So we pick a
+# /23 in 10.0.0.0/8 but well outside that reserved block: 10.0.0.0/23.
+resource "google_compute_subnetwork" "proxy_only" {
+  name          = "notiflex-proxy-only"
+  project       = var.project_id
+  region        = "us-central1"
+  network       = "https://www.googleapis.com/compute/v1/projects/${var.project_id}/global/networks/default"
+  ip_cidr_range = "10.0.0.0/23"
+  purpose       = "REGIONAL_MANAGED_PROXY"
+  role          = "ACTIVE"
+}
+
 # Spot, e2-medium, autoscaling 1->3, Gateway API (standard channel), zonal.
 resource "google_container_cluster" "notiflex" {
   name     = var.cluster_name
